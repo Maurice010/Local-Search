@@ -7,7 +7,8 @@ using namespace std;
 class State {
 public:
     vector<int> state;
-    State(const vector<int>& state) : state{state} {}
+    vector<vector<int>> board;
+    State(const vector<int>& state, const vector<vector<int>>& board) : state{state}, board{board} {}
 
     tuple<int, int, int> generateRandState() {
         int i = rand() % state.size();
@@ -20,10 +21,9 @@ public:
 
 class Problem {
 public:
-    vector<vector<int>> currentBoard;
     State currentState;
-    // startState
-    Problem(const vector<vector<int>>& board, const State& initialState) : currentBoard{board},  currentState{initialState} {}
+
+    Problem(const State& initialState) : currentState{initialState} {}
 
     void showBoard(vector<vector<int>>& board) {
         int size = board.size();
@@ -35,8 +35,8 @@ public:
         }
     }
 
-    // goalStateTest
-    int conflictNum(vector<vector<int>> board) {
+    int objectiveFunction(State& currentState) {
+        vector<vector<int>> board = currentState.board;
         int conflicts = 0;
         int n = board.size();
         int conflictsRow = 0;
@@ -104,60 +104,53 @@ public:
         return conflicts;
     }
 
-    // getNextState
-    // TODO: it changes current state but it would be better if it just returned
-    //       the next state and let the algo do the rest
-    void getNextState(vector<vector<int>>& currentBoard, State& currentState) {
-        int size = currentBoard.size();
-        int tmpObjValue = conflictNum(currentBoard);
+    State getNextState(State& currentState) {
+        int size = currentState.board.size();
+        int tmpObjValue = objectiveFunction(currentState);
 
-        State nextState = currentState;
-        vector<vector<int>> nextBoard = currentBoard;
-
-        State tmpState = currentState;
-        vector<vector<int>> tmpBoard = currentBoard;
+        State nextState(currentState.state, currentState.board);
+        State tmpState(currentState.state, currentState.board);
 
         for(int i = 0; i < size; i++) {
             for(int j = 0; j < size; j++) {
                 if(j != currentState.state[i]) {
                     nextState.state[i] = j;
-                    nextBoard[nextState.state[i]][i] = 1;
-                    nextBoard[currentState.state[i]][i] = 0;
+                    nextState.board[nextState.state[i]][i] = 1;
+                    nextState.board[currentState.state[i]][i] = 0;
 
-                    int nextObjValue = conflictNum(nextBoard);
+                    int nextObjValue = objectiveFunction(nextState);
 
                     if(nextObjValue <= tmpObjValue) {
                         tmpObjValue = nextObjValue;
                         tmpState = nextState;
-                        tmpBoard = nextBoard;
                     }
 
-                    nextBoard[nextState.state[i]][i] = 0;
+                    nextState.board[nextState.state[i]][i] = 0;
                     nextState.state[i] = currentState.state[i];
-                    nextBoard[currentState.state[i]][i] = 1;
+                    nextState.board[currentState.state[i]][i] = 1;
                 }
             }
         }
 
-        currentState = tmpState;
-        currentBoard = tmpBoard;
+        return tmpState;
     }
 };
 
 void hillClimb(Problem& problem) {
-    while(true) {
-        vector<vector<int>> currBoard = problem.currentBoard;
-        State currState = problem.currentState;
-
-        problem.getNextState(problem.currentBoard, problem.currentState);
-        if(currState.state == problem.currentState.state) {
-            problem.showBoard(problem.currentBoard);
+    int iteration = 0;
+    while(iteration <= 1000) {
+        State newState = problem.getNextState(problem.currentState);
+        if(newState.state == problem.currentState.state) {
+            cout << "Finished after: " << iteration << " iterations." << endl;
+            problem.showBoard(problem.currentState.board);
             break;
-        } else if(problem.conflictNum(currBoard) == problem.conflictNum(problem.currentBoard)) {
+        } else if(problem.objectiveFunction(newState) == problem.objectiveFunction(problem.currentState)) {
             tuple<int, int, int> coord = problem.currentState.generateRandState();
-            problem.currentBoard[get<0>(coord)][get<2>(coord)] = 1;
-            problem.currentBoard[get<0>(coord)][get<1>(coord)] = 0;
+            problem.currentState.board[get<0>(coord)][get<2>(coord)] = 1;
+            problem.currentState.board[get<0>(coord)][get<1>(coord)] = 0;
         }
+        problem.currentState = newState;
+        iteration++;
     }
 }
 
@@ -174,23 +167,17 @@ int main() {
     chessboard[2][2] = 1;
     chessboard[1][3] = 1;
 
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            cout << chessboard[i][j] << " ";
-        }
-        cout << endl;
-    }
-
     vector<int> state(chessboard.size());
     state[0] = 2;
     state[1] = 1;
     state[2] = 2;
     state[3] = 1;
 
-    State initialState(state);
+    State initialState(state, chessboard);
 
-    Problem test(chessboard, initialState);
-    cout << test.conflictNum(chessboard) << endl;
+    Problem test(initialState);
+    cout << "Initial objective function value: " << test.objectiveFunction(initialState) << endl;
+    test.showBoard(test.currentState.board);
     hillClimb(test);
 
     return 0;
